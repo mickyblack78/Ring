@@ -2,30 +2,48 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mick's Image Merger V3</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Mick's Super Swap & Edit V4</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #222; color: white; padding: 20px; }
-        canvas { border: 2px solid #555; max-width: 100%; height: auto; background: #333; margin-top: 10px; }
-        .controls { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; align-items: center; }
-        input { background: #444; color: white; padding: 10px; border-radius: 5px; border: none; width: 80%; }
-        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        body { font-family: sans-serif; text-align: center; background: #1a1a1a; color: white; margin: 0; padding: 10px; overflow-x: hidden; }
+        canvas { border: 2px solid #444; max-width: 100%; height: auto; background: #000; display: block; margin: 10px auto; touch-action: none; }
+        .toolbar { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; background: #333; padding: 15px; border-radius: 10px; margin-bottom: 10px; }
+        .slider-group { grid-column: span 2; background: #444; padding: 10px; border-radius: 8px; margin-top: 5px; }
+        label { display: block; font-size: 12px; margin-bottom: 5px; color: #bbb; }
+        input[type="file"] { width: 90%; font-size: 12px; margin-bottom: 10px; }
+        input[type="range"] { width: 100%; height: 25px; }
+        button { padding: 12px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        button.active { background: #28a745; border: 2px solid white; }
+        .download-btn { background: #dc3545; grid-column: span 2; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <h2>Image Merger V3</h2>
+    <h3>Mick's Super Editor V4</h3>
     
-    <div class="controls">
-        <label>1. Upload Body (Background):</label>
-        <input type="file" id="bgInput" accept="image/*">
-        
-        <label>2. Upload Head (Foreground):</label>
-        <input type="file" id="fgInput" accept="image/*">
-        
-        <label>Scale Head:</label>
-        <input type="range" id="scale" min="0.1" max="2" step="0.01" value="1">
-        <button id="download">Download Result</button>
+    <div class="toolbar">
+        <div>
+            <label>1. Body (BG):</label>
+            <input type="file" id="bgInput" accept="image/*">
+        </div>
+        <div>
+            <label>2. Head (FG):</label>
+            <input type="file" id="fgInput" accept="image/*">
+        </div>
+
+        <button id="modeMove" class="active">Mode: Move Head</button>
+        <button id="modeHeal">Mode: Blemish Fix</button>
+
+        <div class="slider-group">
+            <label id="sliderLabel">Head Scale / Brush Size</label>
+            <input type="range" id="mainSlider" min="0.1" max="2" step="0.01" value="1">
+            
+            <label>Brightness</label>
+            <input type="range" id="brightSlider" min="0" max="200" step="1" value="100">
+        </div>
+
+        <button id="reset">Reset All</button>
+        <button id="download" class="download-btn">Download Final</button>
     </div>
 
     <canvas id="canvas"></canvas>
@@ -35,71 +53,100 @@
         const ctx = canvas.getContext('2d');
         const bgInput = document.getElementById('bgInput');
         const fgInput = document.getElementById('fgInput');
-        const scaleInput = document.getElementById('scale');
-        const downloadBtn = document.getElementById('download');
+        const mainSlider = document.getElementById('mainSlider');
+        const brightSlider = document.getElementById('brightSlider');
+        const modeMove = document.getElementById('modeMove');
+        const modeHeal = document.getElementById('modeHeal');
 
-        let bgImg = null;
-        let fgImg = null;
+        let bgImg = null, fgImg = null;
         let fgPos = { x: 50, y: 50 };
-        let isDragging = false;
+        let currentMode = 'move'; // 'move' or 'heal'
+        let isDrawing = false;
+
+        function updateUI() {
+            modeMove.classList.toggle('active', currentMode === 'move');
+            modeHeal.classList.toggle('active', currentMode === 'heal');
+            document.getElementById('sliderLabel').innerText = (currentMode === 'move') ? "Head Scale" : "Brush Size";
+            if(currentMode === 'heal') { mainSlider.min = 5; mainSlider.max = 50; mainSlider.value = 20; }
+            else { mainSlider.min = 0.1; mainSlider.max = 2; mainSlider.value = 1; }
+        }
+
+        modeMove.onclick = () => { currentMode = 'move'; updateUI(); };
+        modeHeal.onclick = () => { currentMode = 'heal'; updateUI(); };
 
         function draw() {
             if (!bgImg) return;
             canvas.width = bgImg.width;
             canvas.height = bgImg.height;
+            
+            // Apply Brightness
+            ctx.filter = `brightness(${brightSlider.value}%)`;
             ctx.drawImage(bgImg, 0, 0);
+            ctx.filter = 'none';
 
             if (fgImg) {
-                const sw = fgImg.width * scaleInput.value;
-                const sh = fgImg.height * scaleInput.value;
+                const sw = fgImg.width * (currentMode === 'move' ? mainSlider.value : 1);
+                const sh = fgImg.height * (currentMode === 'move' ? mainSlider.value : 1);
                 ctx.drawImage(fgImg, fgPos.x, fgPos.y, sw, sh);
             }
         }
 
+        // Blemish Removal (Healing) logic
+        function heal(x, y) {
+            const size = parseInt(mainSlider.value);
+            // Grab pixels from 20px to the left to "cover" the blemish
+            ctx.drawImage(canvas, x - size - 20, y - size, size * 2, size * 2, x - size, y - size, size * 2, size * 2);
+        }
+
         bgInput.onchange = (e) => {
             const reader = new FileReader();
-            reader.onload = (event) => {
-                bgImg = new Image();
-                bgImg.onload = draw;
-                bgImg.src = event.target.result;
-            };
+            reader.onload = (ev) => { bgImg = new Image(); bgImg.onload = draw; bgImg.src = ev.target.result; };
             reader.readAsDataURL(e.target.files[0]);
         };
 
         fgInput.onchange = (e) => {
             const reader = new FileReader();
-            reader.onload = (event) => {
-                fgImg = new Image();
-                fgImg.onload = draw;
-                fgImg.src = event.target.result;
-            };
+            reader.onload = (ev) => { fgImg = new Image(); fgImg.onload = draw; fgImg.src = ev.target.result; };
             reader.readAsDataURL(e.target.files[0]);
         };
 
-        scaleInput.oninput = draw;
+        mainSlider.oninput = draw;
+        brightSlider.oninput = draw;
 
-        // Mobile Touch Controls to move the head
-        canvas.addEventListener('touchstart', (e) => { isDragging = true; });
-        canvas.addEventListener('touchend', () => { isDragging = false; });
+        canvas.addEventListener('touchstart', (e) => { 
+            isDrawing = true; 
+            handleInput(e.touches[0]);
+        });
         canvas.addEventListener('touchmove', (e) => {
-            if (!isDragging || !fgImg) return;
+            if (!isDrawing) return;
+            handleInput(e.touches[0]);
+            e.preventDefault();
+        });
+        canvas.addEventListener('touchend', () => { isDrawing = false; });
+
+        function handleInput(touch) {
             const rect = canvas.getBoundingClientRect();
-            const touch = e.touches[0];
             const scaleX = canvas.width / rect.width;
             const scaleY = canvas.height / rect.height;
-            fgPos.x = (touch.clientX - rect.left) * scaleX - (fgImg.width * scaleInput.value / 2);
-            fgPos.y = (touch.clientY - rect.top) * scaleY - (fgImg.height * scaleInput.value / 2);
-            draw();
-            e.preventDefault();
-        }, { passive: false });
+            const x = (touch.clientX - rect.left) * scaleX;
+            const y = (touch.clientY - rect.top) * scaleY;
 
-        downloadBtn.onclick = () => {
+            if (currentMode === 'move' && fgImg) {
+                fgPos.x = x - (fgImg.width * mainSlider.value / 2);
+                fgPos.y = y - (fgImg.height * mainSlider.value / 2);
+                draw();
+            } else if (currentMode === 'heal') {
+                heal(x, y);
+            }
+        }
+
+        document.getElementById('reset').onclick = () => { location.reload(); };
+        document.getElementById('download').onclick = () => {
             const link = document.createElement('a');
-            link.download = 'mick_swap_v3.png';
+            link.download = 'mick_edit_v4.png';
             link.href = canvas.toDataURL();
             link.click();
         };
     </script>
 </body>
 </html>
-
