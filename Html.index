@@ -1,1 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mick's Image Merger V3</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #222; color: white; padding: 20px; }
+        canvas { border: 2px solid #555; max-width: 100%; height: auto; background: #333; margin-top: 10px; }
+        .controls { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; align-items: center; }
+        input { background: #444; color: white; padding: 10px; border-radius: 5px; border: none; width: 80%; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h2>Image Merger V3</h2>
+    
+    <div class="controls">
+        <label>1. Upload Body (Background):</label>
+        <input type="file" id="bgInput" accept="image/*">
+        
+        <label>2. Upload Head (Foreground):</label>
+        <input type="file" id="fgInput" accept="image/*">
+        
+        <label>Scale Head:</label>
+        <input type="range" id="scale" min="0.1" max="2" step="0.01" value="1">
+        
+        <button id="download">Download Result</button>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const bgInput = document.getElementById('bgInput');
+        const fgInput = document.getElementById('fgInput');
+        const scaleInput = document.getElementById('scale');
+        const downloadBtn = document.getElementById('download');
+
+        let bgImg = null;
+        let fgImg = null;
+        let fgPos = { x: 50, y: 50 };
+        let isDragging = false;
+
+        function draw() {
+            if (!bgImg) return;
+            canvas.width = bgImg.width;
+            canvas.height = bgImg.height;
+            ctx.drawImage(bgImg, 0, 0);
+
+            if (fgImg) {
+                const sw = fgImg.width * scaleInput.value;
+                const sh = fgImg.height * scaleInput.value;
+                ctx.drawImage(fgImg, fgPos.x, fgPos.y, sw, sh);
+            }
+        }
+
+        bgInput.onchange = (e) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                bgImg = new Image();
+                bgImg.onload = draw;
+                bgImg.src = event.target.result;
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        };
+
+        fgInput.onchange = (e) => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                fgImg = new Image();
+                fgImg.onload = draw;
+                fgImg.src = event.target.result;
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        };
+
+        scaleInput.oninput = draw;
+
+        // Mobile Touch Controls to move the head
+        canvas.addEventListener('touchstart', (e) => { isDragging = true; });
+        canvas.addEventListener('touchend', () => { isDragging = false; });
+        canvas.addEventListener('touchmove', (e) => {
+            if (!isDragging || !fgImg) return;
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            fgPos.x = (touch.clientX - rect.left) * scaleX - (fgImg.width * scaleInput.value / 2);
+            fgPos.y = (touch.clientY - rect.top) * scaleY - (fgImg.height * scaleInput.value / 2);
+            draw();
+            e.preventDefault();
+        }, { passive: false });
+
+        downloadBtn.onclick = () => {
+            const link = document.createElement('a');
+            link.download = 'mick_swap_v3.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        };
+    </script>
+</body>
+</html>
 
