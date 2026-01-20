@@ -92,11 +92,38 @@
         }
 
         // Blemish Removal (Healing) logic
-         heal(x, y) {
-            const size = parseInt(mainSlider.value);
-            // Grab pixels from 20px to the left to "cover" the blemish
-            ctx.drawImage(canvas, x - size - 20, y - size, size * 2, size * 2, x - size, y - size, size * 2, size * 2);
+         function heal(x, y) {
+    const size = parseInt(mainSlider.value) || 20;
+    const feather = size * 0.5; // Creates a soft transition area
+
+    // 1. Create a temporary buffer for the "patch"
+    const tempCanvas = document.createElement('canvas');
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCanvas.width = size * 2;
+    tempCanvas.height = size * 2;
+
+    // 2. Define the source (where to grab clean skin) 
+    // We'll grab from 1.5x the size away to find "clean" pixels
+    const srcX = x + size * 1.5;
+    const srcY = y;
+
+    // 3. Draw the clean skin with a feathered edge
+    tempCtx.save();
+    tempCtx.beginPath();
+    tempCtx.arc(size, size, size / 2, 0, Math.PI * 2);
+    tempCtx.clip();
+    
+    // Apply a slight blur filter to the patch itself for smoothness
+    tempCtx.filter = `blur(${feather / 4}px)`;
+    tempCtx.drawImage(canvas, srcX - size, srcY - size, size * 2, size * 2, 0, 0, size * 2, size * 2);
+    tempCtx.restore();
+
+    // 4. Paint the "soft" patch back onto the main canvas
+    ctx.globalAlpha = 0.8; // Allows some original texture to peek through
+    ctx.drawImage(tempCanvas, x - size, y - size);
+    ctx.globalAlpha = 1.0;
          }
+        
 function
         bgInput.onchange = (e) => {
             const reader = new FileReader();
