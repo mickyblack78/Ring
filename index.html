@@ -92,12 +92,12 @@
         }
 
         // Blemish Removal (Healing) logic
-        function heal(x, y) {
+         heal(x, y) {
             const size = parseInt(mainSlider.value);
             // Grab pixels from 20px to the left to "cover" the blemish
             ctx.drawImage(canvas, x - size - 20, y - size, size * 2, size * 2, x - size, y - size, size * 2, size * 2);
-        }
-
+         }
+function
         bgInput.onchange = (e) => {
             const reader = new FileReader();
             reader.onload = (ev) => { bgImg = new Image(); bgImg.onload = draw; bgImg.src = ev.target.result; };
