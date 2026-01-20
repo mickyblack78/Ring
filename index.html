@@ -9,7 +9,12 @@
         canvas { border: 2px solid #444; max-width: 100%; height: auto; background: #000; display: block; margin: 10px auto; touch-action: none; }
         .toolbar { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; background: #333; padding: 15px; border-radius: 10px; margin-bottom: 10px; }
         .slider-group { grid-column: span 2; background: #444; padding: 10px; border-radius: 8px; margin-top: 5px; }
-        label { display: block; font-size: 12px; margin-bottom: 5px; color: #bbb; }
+        label { display: block; font-size: 12px; margin-bottom: 5px; color: #bbb; canvas {
+    /* ... existing rules ... */
+    image-rendering: pixelated; /* Keeps it sharp when you zoom in */
+    max-width: 100vw;
+        }
+              }
         input[type="file"] { width: 90%; font-size: 12px; margin-bottom: 10px; }
         input[type="range"] { width: 100%; height: 25px; }
         button { padding: 12px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
@@ -88,39 +93,30 @@
                 const sw = fgImg.width * (currentMode === 'move' ? mainSlider.value : 1);
                 const sh = fgImg.height * (currentMode === 'move' ? mainSlider.value : 1);
                 ctx.drawImage(fgImg, fgPos.x, fgPos.y, sw, sh);
+                    // --- 1. CLEANED HEAL FUNCTION ---
+        function heal(x, y) {
+            const size = parseInt(mainSlider.value) || 20;
+            const layers = FSEngine.getFrequencyData(ctx, x, y, size);
+            const edges = FSEngine.getEdgeMask(layers.low);
+            const offset = size * 1.8;
+            const cleanColor = ctx.getImageData(x + offset - size, y - size, size * 2, size * 2);
+
+            for (let i = 0; i < layers.low.data.length; i += 4) {
+                if (edges[i / 4] === 255) {
+                    layers.low.data[i] = cleanColor.data[i];
+                    layers.low.data[i+1] = cleanColor.data[i+1];
+                    layers.low.data[i+2] = cleanColor.data[i+2];
+                }
             }
+
+            const final = new Uint8ClampedArray(layers.low.data.length);
+            for (let i = 0; i < final.length; i++) {
+                final[i] = layers.low.data[i] + (layers.high.data[i] - 128);
+            }
+            ctx.putImageData(new ImageData(final, size * 2, size * 2), x - size, y - size);
         }
 
-        // Blemish Removal (Healing) logic
-         function heal(x, y) {
-    const size = parseInt(mainSlider.value) || 20;
-    // 1. Get the separated data and edge map
-    const layers = FSEngine.getFrequencyData(ctx, x, y, size);
-    const edges = FSEngine.getEdgeMask(layers.low);
-    
-    // 2. Sample "clean" skin from a nearby offset
-    const offset = size * 1.8;
-    const cleanColor = ctx.getImageData(x + offset - size, y - size, size * 2, size * 2);
-
-    // 3. Blend: Only apply clean color where there AREN'T edges
-    for (let i = 0; i < layers.low.data.length; i += 4) {
-        if (edges[i / 4] === 255) { // If not an edge
-            layers.low.data[i] = cleanColor.data[i];     // Match R
-            layers.low.data[i+1] = cleanColor.data[i+1]; // Match G
-            layers.low.data[i+2] = cleanColor.data[i+2]; // Match B
-        }
-    }
-
-    // 4. Re-combine Texture + Color and paint
-    const final = new Uint8ClampedArray(layers.low.data.length);
-    for (let i = 0; i < final.length; i++) {
-        final[i] = layers.low.data[i] + (layers.high.data[i] - 128);
-    }
-    ctx.putImageData(new ImageData(final, size * 2, size * 2), x - size, y - size);
-         }
-        
-        
-function
+        // --- 2. INPUT HANDLERS ---
         bgInput.onchange = (e) => {
             const reader = new FileReader();
             reader.onload = (ev) => { bgImg = new Image(); bgImg.onload = draw; bgImg.src = ev.target.result; };
@@ -136,15 +132,8 @@ function
         mainSlider.oninput = draw;
         brightSlider.oninput = draw;
 
-        canvas.addEventListener('touchstart', (e) => { 
-            isDrawing = true; 
-            handleInput(e.touches[0]);
-        });
-        canvas.addEventListener('touchmove', (e) => {
-            if (!isDrawing) return;
-            handleInput(e.touches[0]);
-            e.preventDefault();
-        });
+        canvas.addEventListener('touchstart', (e) => { isDrawing = true; handleInput(e.touches[0]); });
+        canvas.addEventListener('touchmove', (e) => { if (!isDrawing) return; handleInput(e.touches[0]); e.preventDefault(); });
         canvas.addEventListener('touchend', () => { isDrawing = false; });
 
         function handleInput(touch) {
@@ -170,42 +159,37 @@ function
             link.href = canvas.toDataURL();
             link.click();
         };
+
+        // --- 3. FS-SOBEL ENGINE ---
+        const FSEngine = {
+            getFrequencyData: function(ctx, x, y, size) {
+                const imgData = ctx.getImageData(x - size, y - size, size * 2, size * 2);
+                const low = new Uint8ClampedArray(imgData.data);
+                for (let i = 0; i < low.length; i += 4) {
+                    low[i] = (low[i] + low[i+4] || low[i]) / 2;
+                    low[i+1] = (low[i+1] + low[i+5] || low[i+1]) / 2;
+                    low[i+2] = (low[i+2] + low[i+6] || low[i+2]) / 2;
+                }
+                const high = new Uint8ClampedArray(imgData.data.length);
+                for (let i = 0; i < imgData.data.length; i++) {
+                    high[i] = imgData.data[i] - low[i] + 128;
+                }
+                return { low: new ImageData(low, size*2, size*2), high: new ImageData(high, size*2, size*2) };
+            },
+            getEdgeMask: function(imgData) {
+                const w = imgData.width, h = imgData.height, d = imgData.data;
+                const mask = new Uint8ClampedArray(w * h);
+                for (let y = 1; y < h - 1; y++) {
+                    for (let x = 1; x < w - 1; x++) {
+                        const i = (y * w + x) * 4;
+                        const gx = -d[i-w*4-4] + d[i-w*4+4] - 2*d[i-4] + 2*d[i+4] - d[i+w*4-4] + d[i+w*4+4];
+                        const gy = -d[i-w*4-4] - 2*d[i-w*4] - d[i-w*4+4] + d[i+w*4-4] + 2*d[i+w*4] + d[i+w*4+4];
+                        mask[y * w + x] = Math.sqrt(gx*gx + gy*gy) > 40 ? 0 : 255;
+                    }
+                }
+                return mask;
+            }
+        };
     </script>
 </body>
-    // --- MODULE: FS-SOBEL ENGINE ---
-const FSEngine = {
-    // Splits area into High (Texture) and Low (Color) frequencies
-    getFrequencyData: function(ctx, x, y, size) {
-        const imgData = ctx.getImageData(x - size, y - size, size * 2, size * 2);
-        const low = new Uint8ClampedArray(imgData.data);
-        // Simple 3x3 Box Blur for Low Frequency
-        for (let i = 0; i < low.length; i += 4) {
-            low[i] = (low[i] + low[i+4] || low[i]) / 2; // R
-            low[i+1] = (low[i+1] + low[i+5] || low[i+1]) / 2; // G
-            low[i+2] = (low[i+2] + low[i+6] || low[i+2]) / 2; // B
-        }
-        const high = new Uint8ClampedArray(imgData.data.length);
-        for (let i = 0; i < imgData.data.length; i++) {
-            high[i] = imgData.data[i] - low[i] + 128; // Standard FS subtraction
-        }
-        return { low: new ImageData(low, size*2, size*2), high: new ImageData(high, size*2, size*2) };
-    },
-
-    // Detects edges using Sobel logic to prevent color bleeding
-    getEdgeMask: function(imgData) {
-        const w = imgData.width, h = imgData.height, d = imgData.data;
-        const mask = new Uint8ClampedArray(w * h);
-        for (let y = 1; y < h - 1; y++) {
-            for (let x = 1; x < w - 1; x++) {
-                const i = (y * w + x) * 4;
-                // Sobel kernels for X and Y gradients
-                const gx = -d[i-w*4-4] + d[i-w*4+4] - 2*d[i-4] + 2*d[i+4] - d[i+w*4-4] + d[i+w*4+4];
-                const gy = -d[i-w*4-4] - 2*d[i-w*4] - d[i-w*4+4] + d[i+w*4-4] + 2*d[i+w*4] + d[i+w*4+4];
-                mask[y * w + x] = Math.sqrt(gx*gx + gy*gy) > 40 ? 0 : 255; // 0 = Edge (Don't Paint)
-            }
-        }
-        return mask;
-    }
-};
-            
 </html>
