@@ -176,4 +176,40 @@ function
         };
     </script>
 </body>
+    // --- MODULE: FS-SOBEL ENGINE ---
+const FSEngine = {
+    // Splits area into High (Texture) and Low (Color) frequencies
+    getFrequencyData: function(ctx, x, y, size) {
+        const imgData = ctx.getImageData(x - size, y - size, size * 2, size * 2);
+        const low = new Uint8ClampedArray(imgData.data);
+        // Simple 3x3 Box Blur for Low Frequency
+        for (let i = 0; i < low.length; i += 4) {
+            low[i] = (low[i] + low[i+4] || low[i]) / 2; // R
+            low[i+1] = (low[i+1] + low[i+5] || low[i+1]) / 2; // G
+            low[i+2] = (low[i+2] + low[i+6] || low[i+2]) / 2; // B
+        }
+        const high = new Uint8ClampedArray(imgData.data.length);
+        for (let i = 0; i < imgData.data.length; i++) {
+            high[i] = imgData.data[i] - low[i] + 128; // Standard FS subtraction
+        }
+        return { low: new ImageData(low, size*2, size*2), high: new ImageData(high, size*2, size*2) };
+    },
+
+    // Detects edges using Sobel logic to prevent color bleeding
+    getEdgeMask: function(imgData) {
+        const w = imgData.width, h = imgData.height, d = imgData.data;
+        const mask = new Uint8ClampedArray(w * h);
+        for (let y = 1; y < h - 1; y++) {
+            for (let x = 1; x < w - 1; x++) {
+                const i = (y * w + x) * 4;
+                // Sobel kernels for X and Y gradients
+                const gx = -d[i-w*4-4] + d[i-w*4+4] - 2*d[i-4] + 2*d[i+4] - d[i+w*4-4] + d[i+w*4+4];
+                const gy = -d[i-w*4-4] - 2*d[i-w*4] - d[i-w*4+4] + d[i+w*4-4] + 2*d[i+w*4] + d[i+w*4+4];
+                mask[y * w + x] = Math.sqrt(gx*gx + gy*gy) > 40 ? 0 : 255; // 0 = Edge (Don't Paint)
+            }
+        }
+        return mask;
+    }
+};
+            
 </html>
