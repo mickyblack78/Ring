@@ -1,169 +1,171 @@
-<       <!DOCTYPE html>
+      <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mick's Super Swap & Edit V4</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pic Ed Final</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #1a1a1a; color: white; margin: 0; padding: 10px; overflow-x: hidden; }
-        canvas { border: 2px solid #444; max-width: 100%; height: auto; background: #000; display: block; margin: 10px auto; touch-action: none; image-rendering: pixelated; }
-        .toolbar { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; background: #333; padding: 15px; border-radius: 10px; margin-bottom: 10px; }
-        .slider-group { grid-column: span 2; background: #444; padding: 10px; border-radius: 8px; margin-top: 5px; }
-        label { display: block; font-size: 12px; margin-bottom: 5px; color: #bbb; }
-        input[type="file"] { width: 90%; font-size: 12px; margin-bottom: 10px; }
-        input[type="range"] { width: 100%; height: 25px; }
-        button { padding: 12px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        button.active { background: #28a745; border: 2px solid white; }
-        .download-btn { background: #dc3545; grid-column: span 2; margin-top: 10px; }
+        body { margin: 0; background: #000; color: white; display: flex; flex-direction: column; height: 100vh; overflow: hidden; font-family: sans-serif; }
+        #viewport { flex: 1; overflow: hidden; position: relative; background: #050505; display: flex; justify-content: center; align-items: center; }
+        canvas { background: #111; touch-action: none; position: absolute; box-shadow: 0 0 30px #000; transition: filter 0.2s; }
+        
+        /* G35 Navigation Clearance */
+        .bottom-nav { height: 105px; background: rgba(20, 20, 20, 0.9); backdrop-filter: blur(15px); display: flex; justify-content: space-around; align-items: center; padding-bottom: 35px; border-top: 1px solid #444; z-index: 1000; }
+        .liquid-btn { width: 18%; height: 50px; border-radius: 12px; background: rgba(255,255,255,0.1); border: 1px solid #555; color: white; font-size: 9px; font-weight: bold; display: flex; flex-direction: column; justify-content: center; align-items: center; text-transform: uppercase; }
+        .liquid-btn.active { border-color: #00ff64; background: rgba(0, 255, 100, 0.1); color: #00ff64; }
+        
+        .panel { position: absolute; bottom: 140px; width: 92%; left: 4%; background: rgba(25, 25, 25, 0.98); backdrop-filter: blur(25px); border-radius: 20px; padding: 15px; display: none; z-index: 1100; border: 1px solid #666; max-height: 60vh; overflow-y: auto; }
+        .close-x { position: sticky; top: 0; float: right; font-size: 22px; color: #ff4444; font-weight: bold; cursor: pointer; background: #000; border-radius: 50%; width: 30px; height: 30px; text-align: center; }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+        
+        .lib-thumb { width: 100%; aspect-ratio: 1; border-radius: 8px; object-fit: cover; border: 1px solid #555; }
+        .rainbow-bar { -webkit-appearance: none; width: 100%; height: 25px; border-radius: 8px; background: linear-gradient(to right, red, #ff0, lime, cyan, blue, #f0f, red); margin: 15px 0; border: 1px solid #fff; }
+        #shadeGrid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+        .shade-box { height: 35px; border-radius: 6px; border: 1px solid #777; }
+        input[type="range"] { width: 100%; height: 40px; }
     </style>
 </head>
 <body>
-    <h3>Mick's Super Editor V4</h3>
-    <div class="toolbar">
-        <div><label>1. Body (BG):</label><input type="file" id="bgInput" accept="image/*"></div>
-        <div><label>2. Head (FG):</label><input type="file" id="fgInput" accept="image/*"></div>
-        <button id="modeMove" class="active">Mode: Move Head</button>
-        <button id="modeHeal">Mode: Blemish Fix</button>
-        <div class="slider-group">
-            <label id="sliderLabel">Head Scale / Brush Size</label>
-            <input type="range" id="mainSlider" min="0.1" max="2" step="0.01" value="1">
-            <label>Brightness</label>
-            <input type="range" id="brightSlider" min="0" max="200" step="1" value="100">
+    <div id="viewport"><canvas id="canvas"></canvas></div>
+
+    <div id="menuPanel" class="panel">
+        <div class="close-x" onclick="p('menu')">✕</div>
+        <div class="grid">
+            <button class="liquid-btn" onclick="act('add')">Upload</button>
+            <button class="liquid-btn" onclick="act('saveLoc')">Save List</button>
+            <button class="liquid-btn" onclick="act('dl')">Export</button>
         </div>
-        <button id="reset">Reset All</button>
-        <button id="download" class="download-btn">Download Final</button>
+        <div id="savedList" class="grid" style="margin-top:15px; border-top:1px solid #444; padding-top:10px;"></div>
+        <div id="libGrid" class="grid"></div>
     </div>
-    <canvas id="canvas"></canvas>
+
+    <div id="toolsPanel" class="panel">
+        <div class="close-x" onclick="p('tools')">✕</div>
+        <div class="grid">
+            <button class="liquid-btn" onclick="t('rot')">Rotate 30</button>
+            <button class="liquid-btn" onclick="t('undo')">Undo</button>
+            <button class="liquid-btn" onclick="t('sm')">Smooth</button>
+            <button class="liquid-btn" onclick="t('era')">Eraser</button>
+            <button class="liquid-btn" onclick="t('draw')">Draw</button>
+            <button class="liquid-btn" onclick="t('pick')">Pick</button>
+            <button class="liquid-btn" onclick="t('text')">Text</button>
+            <button class="liquid-btn" onmousedown="blink(true)" onmouseup="blink(false)" ontouchstart="blink(true)" ontouchend="blink(false)">Blink</button>
+            <button class="liquid-btn" onclick="if(confirm('Clear?'))ctx.clearRect(0,0,cvs.width,cvs.height)">Clear</button>
+        </div>
+    </div>
+
+    <div id="brushPanel" class="panel">
+        <div class="close-x" onclick="p('brush')">✕</div>
+        <label style="font-size:10px;">SIZE & OPACITY</label>
+        <input type="range" id="size" min="2" max="300" value="60">
+        <input type="range" id="opac" min="1" max="100" value="100">
+    </div>
+
+    <div id="colorPanel" class="panel">
+        <div class="close-x" onclick="p('color')">✕</div>
+        <div id="shadeGrid"></div>
+        <input type="range" min="0" max="360" class="rainbow-bar" oninput="genP(this.value)">
+    </div>
+
+    <nav class="bottom-nav">
+        <div class="liquid-btn" onclick="p('menu')">Menu</div>
+        <div class="liquid-btn" onclick="p('tools')">Tools</div>
+        <div class="liquid-btn" id="lockBtn" onclick="toggleMode()">Edit</div>
+        <div class="liquid-btn" onclick="p('brush')">Brush</div>
+        <div class="liquid-btn" onclick="p('color')">Color</div>
+    </nav>
 
     <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const bgInput = document.getElementById('bgInput');
-        const fgInput = document.getElementById('fgInput');
-        const mainSlider = document.getElementById('mainSlider');
-        const brightSlider = document.getElementById('brightSlider');
-        const modeMove = document.getElementById('modeMove');
-        const modeHeal = document.getElementById('modeHeal');
+        const cvs = document.getElementById('canvas'), ctx = cvs.getContext('2d');
+        let scale = 1, history = [], origData = null, mode = 'pan', curCol = '#ffffff', ox = 0, oy = 0, lastD = 0, sx, sy;
 
-        let bgImg = null, fgImg = null;
-        let fgPos = { x: 50, y: 50 };
-        let currentMode = 'move';
-        let isDrawing = false;
-
-        function updateUI() {
-            modeMove.classList.toggle('active', currentMode === 'move');
-            modeHeal.classList.toggle('active', currentMode === 'heal');
-            document.getElementById('sliderLabel').innerText = (currentMode === 'move') ? "Head Scale" : "Brush Size";
-            if(currentMode === 'heal') { mainSlider.min = 5; mainSlider.max = 50; mainSlider.value = 20; }
-            else { mainSlider.min = 0.1; mainSlider.max = 2; mainSlider.value = 1; }
+        function p(id) {
+            const el = document.getElementById(id+'Panel');
+            const vis = el.style.display === 'block';
+            document.querySelectorAll('.panel').forEach(x => x.style.display = 'none');
+            if(!vis) el.style.display = 'block';
         }
 
-        modeMove.onclick = () => { currentMode = 'move'; updateUI(); };
-        modeHeal.onclick = () => { currentMode = 'heal'; updateUI(); };
-
-        function draw() {
-            if (!bgImg) return;
-            canvas.width = bgImg.width;
-            canvas.height = bgImg.height;
-            ctx.filter = `brightness(${brightSlider.value}%)`;
-            ctx.drawImage(bgImg, 0, 0);
-            ctx.filter = 'none';
-            if (fgImg) {
-                const sw = fgImg.width * (currentMode === 'move' ? mainSlider.value : 1);
-                const sh = fgImg.height * (currentMode === 'move' ? mainSlider.value : 1);
-                ctx.drawImage(fgImg, fgPos.x, fgPos.y, sw, sh);
-            }
+        function toggleMode() {
+            mode = (mode === 'pan') ? 'draw' : 'pan';
+            document.getElementById('lockBtn').innerHTML = (mode === 'pan') ? 'Lock' : 'Edit';
+            document.getElementById('lockBtn').classList.toggle('active', mode !== 'pan');
         }
 
-        function heal(x, y) {
-            const size = parseInt(mainSlider.value) || 20;
-            const layers = FSEngine.getFrequencyData(ctx, x, y, size);
-            const edges = FSEngine.getEdgeMask(layers.low);
-            const offset = size * 1.8;
-            const cleanColor = ctx.getImageData(x + offset - size, y - size, size * 2, size * 2);
-            for (let i = 0; i < layers.low.data.length; i += 4) {
-                if (edges[i / 4] === 255) {
-                    layers.low.data[i] = cleanColor.data[i];
-                    layers.low.data[i+1] = cleanColor.data[i+1];
-                    layers.low.data[i+2] = cleanColor.data[i+2];
-                }
-            }
-            const final = new Uint8ClampedArray(layers.low.data.length);
-            for (let i = 0; i < final.length; i++) {
-                final[i] = layers.low.data[i] + (layers.high.data[i] - 128);
-            }
-            ctx.putImageData(new ImageData(final, size * 2, size * 2), x - size, y - size);
+        function save() { if(history.length > 20) history.shift(); history.push(ctx.getImageData(0,0,cvs.width,cvs.height)); }
+        
+        function blink(on) { if(on && history.length>0) { origData = ctx.getImageData(0,0,cvs.width,cvs.height); ctx.putImageData(history[0],0,0); } else if(origData) { ctx.putImageData(origData,0,0); } }
+
+        function act(type) {
+            if(type==='add'){
+                const i = document.createElement('input'); i.type='file';
+                i.onchange = e => { const r = new FileReader(); r.onload = v => loadUrl(v.target.result); r.readAsDataURL(e.target.files[0]); }; i.click();
+            } else if(type==='saveLoc'){
+                const thumb = document.createElement('img'); thumb.className='lib-thumb'; thumb.src=cvs.toDataURL();
+                thumb.onclick=()=>loadUrl(thumb.src); document.getElementById('savedList').prepend(thumb);
+            } else if(type==='dl'){ const a=document.createElement('a'); a.download='PicEd.png'; a.href=cvs.toDataURL(); a.click(); }
         }
 
-        bgInput.onchange = (e) => {
-            const reader = new FileReader();
-            reader.onload = (ev) => { bgImg = new Image(); bgImg.onload = draw; bgImg.src = ev.target.result; };
-            reader.readAsDataURL(e.target.files[0]);
-        };
-
-        fgInput.onchange = (e) => {
-            const reader = new FileReader();
-            reader.onload = (ev) => { fgImg = new Image(); fgImg.onload = draw; fgImg.src = ev.target.result; };
-            reader.readAsDataURL(e.target.files[0]);
-        };
-
-        mainSlider.oninput = draw;
-        brightSlider.oninput = draw;
-
-        canvas.addEventListener('touchstart', (e) => { isDrawing = true; handleInput(e.touches[0]); });
-        canvas.addEventListener('touchmove', (e) => { if (!isDrawing) return; handleInput(e.touches[0]); e.preventDefault(); }, {passive: false});
-        canvas.addEventListener('touchend', () => { isDrawing = false; });
-
-        function handleInput(touch) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const x = (touch.clientX - rect.left) * scaleX;
-            const y = (touch.clientY - rect.top) * scaleY;
-            if (currentMode === 'move' && fgImg) {
-                fgPos.x = x - (fgImg.width * mainSlider.value / 2);
-                fgPos.y = y - (fgImg.height * mainSlider.value / 2);
-                draw();
-            } else if (currentMode === 'heal') { heal(x, y); }
+        function loadUrl(url) {
+            const m = new Image(); m.crossOrigin = "anonymous";
+            m.onload = () => {
+                cvs.width=m.width; cvs.height=m.height; ctx.drawImage(m,0,0); history=[]; save();
+                ox=0; oy=0; scale=Math.min(innerWidth/m.width, (innerHeight-250)/m.height); upCam();
+            }; m.src = url;
         }
 
-        const FSEngine = {
-            getFrequencyData: function(ctx, x, y, size) {
-                const imgData = ctx.getImageData(x - size, y - size, size * 2, size * 2);
-                const low = new Uint8ClampedArray(imgData.data);
-                for (let i = 0; i < low.length; i += 4) {
-                    low[i] = (low[i] + low[i+4] || low[i]) / 2;
-                    low[i+1] = (low[i+1] + low[i+5] || low[i+1]) / 2;
-                    low[i+2] = (low[i+2] + low[i+6] || low[i+2]) / 2;
-                }
-                const high = new Uint8ClampedArray(imgData.data.length);
-                for (let i = 0; i < imgData.data.length; i++) {
-                    high[i] = imgData.data[i] - low[i] + 128;
-                }
-                return { low: new ImageData(low, size*2, size*2), high: new ImageData(high, size*2, size*2) };
-            },
-            getEdgeMask: function(imgData) {
-                const w = imgData.width, h = imgData.height, d = imgData.data;
-                const mask = new Uint8ClampedArray(w * h);
-                for (let y = 1; y < h - 1; y++) {
-                    for (let x = 1; x < w - 1; x++) {
-                        const i = (y * w + x) * 4;
-                        const gx = -d[i-w*4-4] + d[i-w*4+4] - 2*d[i-4] + 2*d[i+4] - d[i+w*4-4] + d[i+w*4+4];
-                        const gy = -d[i-w*4-4] - 2*d[i-w*4] - d[i-w*4+4] + d[i+w*4-4] + 2*d[i+w*4] + d[i+w*4+4];
-                        mask[y * w + x] = Math.sqrt(gx*gx + gy*gy) > 40 ? 0 : 255;
-                    }
-                }
-                return mask;
-            }
-        };
+        function t(v){
+            if(v==='rot'){
+                save(); const q=document.createElement('canvas'), x=q.getContext('2d');
+                q.width=cvs.width; q.height=cvs.height; x.translate(q.width/2, q.height/2); x.rotate(30*Math.PI/180);
+                x.drawImage(cvs,-cvs.width/2,-cvs.height/2); ctx.clearRect(0,0,cvs.width,cvs.height); ctx.drawImage(q,0,0);
+            } else if(v==='undo'){ if(history.length > 1) { history.pop(); ctx.putImageData(history[history.length-1],0,0); } }
+            else if(v==='text'){ const txt=prompt("Text:"); if(txt){ save(); ctx.fillStyle=curCol; ctx.font="60px Arial"; ctx.fillText(txt,cvs.width/2,cvs.height/2); }}
+            else { mode = v; document.querySelectorAll('.liquid-btn').forEach(b=>b.classList.remove('active')); document.getElementById('lockBtn').innerHTML='Edit'; }
+        }
 
-        document.getElementById('reset').onclick = () => { location.reload(); };
-        document.getElementById('download').onclick = () => {
-            const link = document.createElement('a');
-            link.download = 'mick_edit_v4.png';
-            link.href = canvas.toDataURL();
-            link.click();
-        };
+        function genP(h) {
+            const g = document.getElementById('shadeGrid'); g.innerHTML = '';
+            const core = ['#000000','#ffffff','#D4AF37','#C0C0C0','#ffdbac','#8d5524'];
+            core.forEach(c => { let d=document.createElement('div'); d.className='shade-box'; d.style.background=c; d.onclick=()=>{curCol=c;}; g.appendChild(d); });
+            for(let i=1; i<=6; i++){ let c=`hsl(${h},100%,${i*14}%)`; let d=document.createElement('div'); d.className='shade-box'; d.style.background=c; d.onclick=()=>{curCol=c;}; g.appendChild(d); }
+        }
+
+        function upCam(){ cvs.style.transform = `translate(${ox}px, ${oy}px) scale(${scale})`; }
+
+        window.addEventListener('touchstart', e => {
+            if(e.touches.length === 1){
+                if(mode === 'pan'){ sx=e.touches[0].clientX-ox; sy=e.touches[0].clientY-oy; }
+                else if(mode === 'pick'){ const r=cvs.getBoundingClientRect(); const tx=(e.touches[0].clientX-r.left)*(cvs.width/r.width), ty=(e.touches[0].clientY-r.top)*(cvs.height/r.height); const d=ctx.getImageData(tx,ty,1,1).data; curCol=`rgb(${d[0]},${d[1]},${d[2]})`; mode='draw'; }
+                else { save(); }
+            }
+        });
+
+        window.addEventListener('touchmove', e => {
+            if(e.touches.length === 2){
+                let d = Math.hypot(e.touches[0].pageX-e.touches[1].pageX, e.touches[0].pageY-e.touches[1].pageY);
+                if(lastD>0) scale *= (d/lastD); lastD = d; upCam();
+            } else if (e.touches.length === 1) {
+                if(mode === 'pan'){ ox=e.touches[0].clientX-sx; oy=e.touches[0].clientY-sy; upCam(); }
+                else {
+                    const r=cvs.getBoundingClientRect(); const tx=(e.touches[0].clientX-r.left)*(cvs.width/r.width), ty=(e.touches[0].clientY-r.top)*(cvs.height/r.height);
+                    const s=document.getElementById('size').value, op=document.getElementById('opac').value/100;
+                    ctx.globalAlpha=op; ctx.globalCompositeOperation = (mode==='era')?'destination-out':'source-over';
+                    if(mode==='draw'||mode==='era'){ ctx.fillStyle=curCol; ctx.beginPath(); ctx.arc(tx,ty,s/2,0,Math.PI*2); ctx.fill(); }
+                    else if(mode==='sm'){ ctx.globalAlpha=op*0.1; ctx.filter='blur(10px)'; ctx.drawImage(cvs,tx-s,ty-s,s*2,s*2,tx-s,ty-s,s*2,s*2); ctx.filter='none'; }
+                    ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+                }
+            }
+        }, {passive:false});
+
+        window.addEventListener('touchend', () => lastD=0);
+        
+        // Load Library
+        const lib = ['waterfall','beach','portrait','lion','forest','city','mountain','dog','car','space'];
+        lib.forEach(t => { const img=document.createElement('img'); img.className='lib-thumb'; img.src=`https://source.unsplash.com/featured/400x400?${t}`; img.onclick=()=>loadUrl(img.src); document.getElementById('libGrid').appendChild(img); });
+        
+        genP(0); loadUrl('https://images.unsplash.com/photo-1433086966358-54859d0ed716?w=500');
     </script>
 </body>
-</html>
+    </html>
+    
